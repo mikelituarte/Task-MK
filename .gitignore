@@ -2,3 +2,22 @@
 #Ficheros previos al repo:
 /plan-0/
 /raw/
+
+# Secretos y entornos reales (fase 1, tarea 3). Los *.env.example sí se versionan.
+infrastructure/env/*.env
+infrastructure/env/e2e/
+infrastructure/.env
+
+# Backups locales
+backups/
+
+# Dependencias y artefactos de build
+node_modules
+dist
+coverage
+
+# Informes de Playwright
+playwright-report/
+test-results/
+blob-report/
+playwright/.cache/

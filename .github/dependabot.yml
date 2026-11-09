@@ -1,0 +1,43 @@
+# Dependabot (plan-infrastructure, fase 1, tarea 5; C-04, V-11, SEC-009).
+# - cooldown de 7 días: no se proponen versiones recién publicadas.
+# - Sin automerge: todo PR de Dependabot lo revisa y fusiona una persona.
+version: 2
+
+updates:
+  # npm: frontend, backend e imagen migrate
+  - package-ecosystem: "npm"
+    directories:
+      - "/frontend"
+      - "/backend"
+      - "/infrastructure/mongodb"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+
+  # Docker: los tres Dockerfiles
+  - package-ecosystem: "docker"
+    directories:
+      - "/frontend"
+      - "/backend"
+      - "/infrastructure/mongodb"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+
+  # Imágenes fijadas en los ficheros de Compose (mongo, caddy) (V-11)
+  - package-ecosystem: "docker-compose"
+    directory: "/infrastructure"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7

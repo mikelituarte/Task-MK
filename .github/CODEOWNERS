@@ -1,0 +1,25 @@
+# Rutas que exigen revisión humana del propietario (plan-infrastructure, fase 1, tarea 4).
+# La protección de `main` debe tener activado "Require review from Code Owners".
+
+# Gobierno del repositorio, agentes y entorno de los agentes
+/.github/                                        @mikelituarte
+/.claude/                                        @mikelituarte
+/.devcontainer/                                  @mikelituarte
+/.mcp.json                                       @mikelituarte
+
+# Infraestructura y operación
+/infrastructure/                                 @mikelituarte
+/Makefile                                        @mikelituarte
+**/Dockerfile                                    @mikelituarte
+
+# Cadena de suministro
+**/package-lock.json                             @mikelituarte
+
+# Autenticación y capa HTTP del backend
+/backend/src/modules/auth/                       @mikelituarte
+/backend/src/shared/infrastructure/http/middlewares/ @mikelituarte
+
+# Borde del frontend (SEC-022), autenticación y capa HTTP (plan-frontend D-10)
+/frontend/nginx/                                 @mikelituarte
+/frontend/src/modules/auth/                      @mikelituarte
+/frontend/src/shared/infrastructure/http/        @mikelituarte
