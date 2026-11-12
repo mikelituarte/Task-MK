@@ -1,0 +1,9 @@
+{
+  "proxies": {
+    "default": {
+      "httpProxy": "http://10.250.250.10:3128",
+      "httpsProxy": "http://10.250.250.10:3128",
+      "noProxy": "localhost,127.0.0.1,::1,proxy,frontend,backend,mongodb,migrate"
+    }
+  }
+}
