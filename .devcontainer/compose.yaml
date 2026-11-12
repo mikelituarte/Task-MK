@@ -1,0 +1,80 @@
+# Devcontainer de los agentes y su proxy de salida (plan-infrastructure, fase 2, tareas 1 y 2).
+#
+# Mecanismo de la red de salida (propuesta aprobada el 2026-11-11):
+#   - `workspace` solo está en la red `agent`, con `internal: true`: no tiene ruta a Internet.
+#   - `egress` (Squid) está en `agent` y en `outside`. Es la única salida, y solo acepta
+#     CONNECT al puerto 443 de los dominios de egress/allowlist.txt (lista de S-25).
+#   - El Docker interno sale por la NAT de `workspace`, así que hereda la misma restricción.
+#   - La configuración del proxy se construye en el host: el agente no puede cambiarla
+#     sin que una persona revise el PR y reconstruya el devcontainer.
+#
+# Este fichero es del host. Su Docker no es el que usan los agentes dentro.
+name: taskmk-devcontainer
+
+services:
+  workspace:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        CLAUDE_CODE_VERSION: 2.1.322
+    command: ["sleep", "infinity"]
+    # Docker-in-docker exige un contenedor privilegiado (R-02): se acepta solo en una VM o
+    # en Docker Desktop sin nada sensible.
+    privileged: true
+    volumes:
+      - ..:/workspaces/Task-MK:cached
+      - dind-data:/var/lib/docker
+      - claude-config:/home/node/.claude
+    environment:
+      HTTP_PROXY: http://10.250.250.10:3128
+      HTTPS_PROXY: http://10.250.250.10:3128
+      http_proxy: http://10.250.250.10:3128
+      https_proxy: http://10.250.250.10:3128
+      NO_PROXY: localhost,127.0.0.1,::1,proxy,frontend,backend,mongodb,migrate
+      no_proxy: localhost,127.0.0.1,::1,proxy,frontend,backend,mongodb,migrate
+      CLAUDE_CONFIG_DIR: /home/node/.claude
+      DISABLE_AUTOUPDATER: "1"
+      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
+    networks:
+      agent:
+        ipv4_address: 10.250.250.20
+    depends_on:
+      egress:
+        condition: service_healthy
+
+  egress:
+    build:
+      context: ./egress
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 100
+    tmpfs:
+      - /tmp
+      - /var/spool/squid
+      - /var/run/squid
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/3128"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      agent:
+        ipv4_address: 10.250.250.10
+      outside: {}
+    restart: unless-stopped
+
+networks:
+  agent:
+    internal: true
+    # Fuera de los rangos 172.17–172.31 y 192.168 que reparte el Docker interno.
+    ipam:
+      config:
+        - subnet: 10.250.250.0/24
+  outside: {}
+
+volumes:
+  dind-data:
+  claude-config:

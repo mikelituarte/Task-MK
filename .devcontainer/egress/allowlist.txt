@@ -1,0 +1,37 @@
+# Lista de salida de los agentes (S-25, aprobada el 2026-11-09).
+# Cualquier cambio necesita aprobación humana y reconstruir el devcontainer.
+# Formato `dstdomain` de Squid: un dominio por línea; un punto inicial incluye subdominios.
+# Solo se permite HTTPS (CONNECT al 443).
+
+# Registro de npm
+registry.npmjs.org
+
+# Docker Hub (API del registro, autenticación y descarga de capas)
+registry-1.docker.io
+auth.docker.io
+production.cloudflare.docker.com
+# Descarga de capas observada en el devcontainer (aprobado el 2026-11-12).
+production.cloudfront.docker.com
+
+# GHCR
+ghcr.io
+pkg-containers.githubusercontent.com
+
+# GitHub (git por HTTPS, API para `gh`, descargas de código y adjuntos)
+github.com
+api.github.com
+codeload.github.com
+objects.githubusercontent.com
+release-assets.githubusercontent.com
+
+# Binario de `mongod` para mongodb-memory-server
+fastdl.mongodb.org
+
+# Navegadores de Playwright
+cdn.playwright.dev
+playwright.download.prss.microsoft.com
+
+# API de Claude Code (ampliación de S-25 aprobada el 2026-11-11)
+api.anthropic.com
+# Inicio de sesión de Claude Code (aprobado el 2026-11-12)
+platform.claude.com
