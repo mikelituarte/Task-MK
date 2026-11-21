@@ -36,7 +36,9 @@ Docker interno ──NAT de workspace──┘
 
 ## Identidad de git
 
-Dentro del devcontainer, los commits salen a nombre del bot de la GitHub App (`taskmk-agents-mikelituarte[bot]`, con su email `noreply` de GitHub), configurado a nivel de sistema en el `Dockerfile`. El push y los PR usan el token de la App (`GH_TOKEN`). Ninguna identidad personal entra en el devcontainer.
+Dentro del devcontainer, los commits salen a nombre del bot de la GitHub App (`taskmk-agents-mikelituarte[bot]`, con su email `noreply` de GitHub). La fijan las variables `GIT_AUTHOR_*` y `GIT_COMMITTER_*` de `compose.yaml`, que prevalecen sobre el `[user]` que pueda tener el `.git/config` del repositorio: ese fichero se monta desde el host y lo comparten las dos identidades.
+
+Los remotos SSH del host (`git@github.com:…` o un alias de `~/.ssh/config`) se convierten a HTTPS con `url.*.insteadOf` de sistema, porque dentro no hay cliente SSH ni claves. El push y los PR usan el token de la App (`GH_TOKEN`). `taskmk-verify-isolation` comprueba la identidad y el remoto.
 
 ## Actualizaciones
 

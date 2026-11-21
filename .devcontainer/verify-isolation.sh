@@ -26,6 +26,11 @@ check_not "no existe /etc/taskmk"                  test -e /etc/taskmk
 check_not "no hay agente SSH reenviado"            test -S "${SSH_AUTH_SOCK:-/nonexistent}"
 check_not "git no usa ayudantes de credenciales del host" \
   bash -c "git config --get-all credential.helper | grep -Ev '^$|gh auth git-credential'"
+check "git firma como el bot de la App" \
+  bash -c 'git var GIT_AUTHOR_IDENT | grep -qF "<354595613+taskmk-agents-mikelituarte[bot]@users.noreply.github.com>" &&
+           git var GIT_COMMITTER_IDENT | grep -qF "<354595613+taskmk-agents-mikelituarte[bot]@users.noreply.github.com>"'
+check "el remoto origin se usa por HTTPS" \
+  bash -c 'git -C /workspaces/Task-MK remote get-url --push origin | grep -q "^https://github.com/"'
 check_not "Docker no usa ayudantes de credenciales del host" \
   grep -Eq '"(credsStore|credHelpers)"' "$HOME/.docker/config.json"
 
