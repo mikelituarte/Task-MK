@@ -50,11 +50,18 @@ RUN if [ -n "${CLAUDE_CODE_VERSION}" ]; then \
 # Git usa siempre el token de la GitHub App (GH_TOKEN, S-24) a través de `gh`, a nivel de
 # sistema. Ninguna credencial personal del host debe sustituirlo (ver
 # docs/infrastructure/devcontainer.md, «Ajustes del host»).
+# - La identidad del bot la fijan las variables GIT_* de compose.yaml, que prevalecen sobre
+#   el `.git/config` del repositorio montado; `user.*` de sistema es solo el valor de reserva.
+# - `insteadOf` convierte los remotos SSH del host (incluido un alias de ~/.ssh/config) a
+#   HTTPS: dentro no hay cliente SSH ni claves.
 RUN git config --system credential.https://github.com.helper '' \
  && git config --system --add credential.https://github.com.helper '!gh auth git-credential' \
  && git config --system safe.directory /workspaces/Task-MK \
  && git config --system user.name 'taskmk-agents-mikelituarte[bot]' \
- && git config --system user.email '354595613+taskmk-agents-mikelituarte[bot]@users.noreply.github.com'
+ && git config --system user.email '354595613+taskmk-agents-mikelituarte[bot]@users.noreply.github.com' \
+ && git config --system --add url.https://github.com/.insteadOf 'git@github.com:' \
+ && git config --system --add url.https://github.com/.insteadOf 'ssh://git@github.com/' \
+ && git config --system --add url.https://github.com/.insteadOf 'git@github-mikelituarte:'
 
 # Directorios del usuario `node` que se montan como volúmenes nombrados: se crean aquí
 # para que el volumen herede el propietario.

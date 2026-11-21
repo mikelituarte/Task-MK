@@ -33,6 +33,12 @@ services:
       https_proxy: http://10.250.250.10:3128
       NO_PROXY: localhost,127.0.0.1,::1,proxy,frontend,backend,mongodb,migrate
       no_proxy: localhost,127.0.0.1,::1,proxy,frontend,backend,mongodb,migrate
+      # Identidad del bot de la GitHub App. Las variables prevalecen sobre cualquier
+      # `[user]` del `.git/config` del repositorio, que se monta desde el host.
+      GIT_AUTHOR_NAME: taskmk-agents-mikelituarte[bot]
+      GIT_AUTHOR_EMAIL: 354595613+taskmk-agents-mikelituarte[bot]@users.noreply.github.com
+      GIT_COMMITTER_NAME: taskmk-agents-mikelituarte[bot]
+      GIT_COMMITTER_EMAIL: 354595613+taskmk-agents-mikelituarte[bot]@users.noreply.github.com
       CLAUDE_CONFIG_DIR: /home/node/.claude
       DISABLE_AUTOUPDATER: "1"
       CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
