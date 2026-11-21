@@ -26,6 +26,25 @@ updates:
     cooldown:
       default-days: 7
 
+  # Devcontainer de los agentes: bases del workspace y del proxy de salida.
+  # Tras fusionar un PR de este bloque: reconstruir y `taskmk-verify-isolation --full`.
+  - package-ecosystem: "docker"
+    directories:
+      - "/.devcontainer"
+      - "/.devcontainer/egress"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+
+  # Devcontainer de los agentes: feature docker-in-docker y devcontainer-lock.json.
+  - package-ecosystem: "devcontainers"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+
   # Imágenes fijadas en los ficheros de Compose (mongo, caddy) (V-11)
   - package-ecosystem: "docker-compose"
     directory: "/infrastructure"

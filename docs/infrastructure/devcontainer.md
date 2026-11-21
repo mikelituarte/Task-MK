@@ -7,7 +7,7 @@ Entorno aislado en el que trabajan los agentes (plan-infrastructure, fase 2; SEC
 | Fichero | Función |
 |---|---|
 | `.devcontainer/devcontainer.json` | Servicio `workspace`, feature docker-in-docker, `GH_TOKEN` de la App, comprobación al arrancar |
-| `.devcontainer/Dockerfile` | Debian (glibc) con Node 26, `git`, `make`, `gh` y Claude Code 2.1.322 |
+| `.devcontainer/Dockerfile` | `node:26-trixie-slim` (Debian, glibc) con `git`, `make`, `gh` y Claude Code 2.1.322 |
 | `.devcontainer/compose.yaml` | `workspace` en la red interna `agent`; proxy `egress` como única salida |
 | `.devcontainer/egress/` | Imagen de Squid, su configuración y la lista de salida (S-25) |
 | `.devcontainer/verify-isolation.sh` | Comprobaciones de los criterios de aceptación (`taskmk-verify-isolation`) |
@@ -15,7 +15,7 @@ Entorno aislado en el que trabajan los agentes (plan-infrastructure, fase 2; SEC
 
 ## Red de salida
 
-Mecanismo aprobado el 2026-11-11. La lista es la de S-25 (2026-11-09), ampliada el 2026-11-11 con `api.anthropic.com`.
+Mecanismo aprobado el 2026-11-11. La lista es la de S-25 (2026-11-09), ampliada el 2026-11-11 con `api.anthropic.com` y el 2026-11-12 con `production.cloudfront.docker.com` (capas de Docker Hub) y `platform.claude.com` (inicio de sesión de Claude Code).
 
 ```
 workspace (red agent, internal) ──CONNECT :443──► egress (Squid) ──► Internet, solo dominios de allowlist.txt
@@ -33,6 +33,14 @@ Docker interno ──NAT de workspace──┘
 2. Claude Code se instala en la imagen con la versión fijada en `compose.yaml` y en el `Dockerfile` (2.1.322, aprobada el 2026-11-11). Cambiarla exige aprobación humana y reconstruir.
 3. Abrir el devcontainer (`devcontainer up --workspace-folder .` o VS Code). El token caduca en una hora: para renovarlo hay que reabrir el devcontainer con el nuevo valor.
 4. Revisar la salida de `taskmk-verify-isolation`, que se ejecuta en cada arranque. `taskmk-verify-isolation --full` comprueba además `docker pull` y la salida de un contenedor anidado.
+
+## Identidad de git
+
+Dentro del devcontainer, los commits salen a nombre del bot de la GitHub App (`taskmk-agents-mikelituarte[bot]`, con su email `noreply` de GitHub), configurado a nivel de sistema en el `Dockerfile`. El push y los PR usan el token de la App (`GH_TOKEN`). Ninguna identidad personal entra en el devcontainer.
+
+## Actualizaciones
+
+Las bases (`node:26-trixie-slim`, `debian:trixie-slim`) y la feature docker-in-docker están fijadas por digest. Dependabot propone sus actualizaciones cada semana, con 7 días de espera (`.github/dependabot.yml`). Antes de fusionar un PR de Dependabot que toque `.devcontainer/`, hay que reconstruir el devcontainer y comprobar que `taskmk-verify-isolation --full` sigue en `OK`. Claude Code y Docker van fijados por versión y no los actualiza Dependabot: cambiarlos exige aprobación humana.
 
 ## Ajustes del host
 
@@ -56,28 +64,54 @@ Unión de `raw-infrastructure.md` §12 y SEC-008: lectura y edición de `.env*`,
 - **Exfiltración a dominios permitidos.** El proxy no inspecciona TLS: un agente podría enviar datos a un dominio de la lista (por ejemplo, a un PR público). Solo hay secretos de desarrollo al alcance.
 - **DNS.** La red interna no resuelve nombres externos; las herramientas los resuelven a través del proxy.
 
+## Comandos habituales
 
-# Comandos
+Todos se ejecutan en el host, desde la raíz del repositorio. `<script-del-token>` es el script del host que emite el token de la App (S-24); no se versiona.
 
-# Comandos para arrancar:
-- docker compose -f .devcontainer/compose.yaml down
-- docker compose -f .devcontainer/compose.yaml build
-- devcontainer up --workspace-folder .
+### Arrancar
 
-## Recostruir el proxy:
-- docker compose -f .devcontainer/compose.yaml up -d --build egress
+```sh
+export TASKMK_AGENT_GH_TOKEN="$(<script-del-token>)"
+devcontainer up --workspace-folder .
+```
 
-- devcontainer exec --workspace-folder . taskmk-verify-isolation --full
+### Entrar en una terminal del devcontainer
 
-## Comprobar que el token de la app solo ve Task-MK:
-- devcontainer exec --workspace-folder . gh api /installation/repositories --jq '.repositories[].full_name'
+```sh
+devcontainer exec --workspace-folder . bash
+```
 
-## Entrar en la terminal:
-- devcontainer exec --workspace-folder . bash
+### Reconstruir desde cero
 
-## Recostrucción:
-- docker compose -f .devcontainer/compose.yaml down
-- docker compose -f .devcontainer/compose.yaml build
-- devcontainer up --workspace-folder .
-- devcontainer exec --workspace-folder . taskmk-verify-isolation --full
-- devcontainer exec --workspace-folder . claude --version
+Tras cambiar cualquier fichero de `.devcontainer/`. Los volúmenes (Docker interno, sesión de Claude Code) se conservan.
+
+```sh
+docker compose -f .devcontainer/compose.yaml down
+docker compose -f .devcontainer/compose.yaml build
+devcontainer up --workspace-folder .
+devcontainer exec --workspace-folder . taskmk-verify-isolation --full
+devcontainer exec --workspace-folder . claude --version
+```
+
+### Reconstruir solo el proxy
+
+Tras cambiar `.devcontainer/egress/` (por ejemplo, la lista de salida).
+
+```sh
+docker compose -f .devcontainer/compose.yaml up -d --build egress
+devcontainer exec --workspace-folder . taskmk-verify-isolation --full
+```
+
+### Diagnóstico
+
+```sh
+# Destinos rechazados por el proxy
+docker logs taskmk-devcontainer-egress-1 2>&1 | grep TCP_DENIED | tail -n 20
+
+# El token de la App solo ve Task-MK
+devcontainer exec --workspace-folder . gh api /installation/repositories --jq '.repositories[].full_name'
+
+# Ejecuciones de Dependabot y motivo de un fallo (con la sesión personal de gh, no con el token de la App)
+gh api repos/{owner}/{repo}/actions/runs --jq '.workflow_runs[] | select(.path | startswith("dynamic/dependabot")) | "\(.id) \(.name) \(.conclusion)"'
+gh run view <id> --log-failed | grep -iE "error|not found|dependency_file" | head -n 20
+```
