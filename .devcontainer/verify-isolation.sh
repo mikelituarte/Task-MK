@@ -35,7 +35,7 @@ for _ in $(seq 1 30); do docker info >/dev/null 2>&1 && break; sleep 1; done
 check_not "el socket de Docker no está montado desde el host" \
   grep -q 'docker.sock' /proc/self/mountinfo
 check "el daemon de Docker es el interno" \
-  bash -c '[ "$(docker info --format "{{.Name}}")" = "$(hostname)" ]'
+  bash -c '[ "$(docker info --format "{{.Name}}")" = "$(cat /proc/sys/kernel/hostname)" ]'
 
 echo "Red de salida"
 check "dominio de la lista por el proxy (registry.npmjs.org)" \

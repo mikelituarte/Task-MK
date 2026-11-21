@@ -9,9 +9,11 @@
 # - La salida a Internet no se controla aquí, sino en la red de compose.yaml (tarea 2):
 #   este contenedor solo está en una red `internal` y sale por el proxy `egress`.
 #
-# Base fijada por digest el 2026-11-12 (`docker buildx imagetools inspect node:26-trixie`).
-ARG NODE_IMAGE=node:26-trixie@sha256:e18c3ccdf7d71619990b0e85639f506e2028a95410999cab24cc373cbd10e0ac
-FROM ${NODE_IMAGE}
+# Base `-slim` fijada por digest el 2026-11-21: la imagen completa trae compiladores y
+# bibliotecas de desarrollo que no se usan y acumulan vulnerabilidades. Si una dependencia
+# nativa necesita compilarse en `npm ci`, se añade `build-essential` abajo.
+# Va escrita en el FROM, sin ARG, para que Dependabot pueda actualizarla.
+FROM node:26-trixie-slim@sha256:e6bedef217677b276c591795e169840edd9096dbf13f29df8ef8d1856b8820bc
 
 # Versión exacta de Claude Code, aprobada el 2026-11-11. Cambiarla exige aprobación humana.
 # Vacía, no se instala. Se instala como root, fuera del alcance de escritura del agente.
@@ -50,7 +52,9 @@ RUN if [ -n "${CLAUDE_CODE_VERSION}" ]; then \
 # docs/infrastructure/devcontainer.md, «Ajustes del host»).
 RUN git config --system credential.https://github.com.helper '' \
  && git config --system --add credential.https://github.com.helper '!gh auth git-credential' \
- && git config --system safe.directory /workspaces/Task-MK
+ && git config --system safe.directory /workspaces/Task-MK \
+ && git config --system user.name 'taskmk-agents-mikelituarte[bot]' \
+ && git config --system user.email '354595613+taskmk-agents-mikelituarte[bot]@users.noreply.github.com'
 
 # Directorios del usuario `node` que se montan como volúmenes nombrados: se crean aquí
 # para que el volumen herede el propietario.
