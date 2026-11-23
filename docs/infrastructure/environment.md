@@ -10,7 +10,7 @@ Producción no usa estos ficheros: ver [`docs/deployment/secrets.md`](../deploym
 |---|---|---|---|
 | `env/backend.env.example` | `env/backend.env` | `backend` | `PORT`, `MONGODB_URI` (usuario `app`), `JWT_ACCESS_SECRET`, `JWT_ACCESS_TTL`, `REFRESH_TTL`, `REFRESH_FAMILY_TTL`, `REFRESH_GRACE_SECONDS`, `CSRF_SECRET`, `LOGIN_THROTTLE_SECRET`, `APP_URL`, `LOG_LEVEL` |
 | `env/mongodb.env.example` | `env/mongodb.env` | `mongodb` | `MONGO_INITDB_ROOT_USERNAME`, `MONGO_INITDB_ROOT_PASSWORD`, `MONGO_INITDB_DATABASE`, `MONGO_APP_USER`, `MONGO_APP_PASSWORD`, `MONGO_MIGRATE_USER`, `MONGO_MIGRATE_PASSWORD`, `MONGO_BACKUP_USER`, `MONGO_BACKUP_PASSWORD` |
-| `env/migrate.env.example` | `env/migrate.env` | `migrate` | `MONGODB_URI` (usuario `migrate`) |
+| `env/migrate.env.example` | `env/migrate.env` | `migrate` | `MONGODB_URI` (usuario `migrate`; la ruta del URI es la base de datos de `migrate-mongo-config.js`) |
 | `env/backup.env.example` | `env/backup.env` | `backup.sh` (host) | `MONGO_BACKUP_USER`, `MONGO_BACKUP_PASSWORD`, `BACKUP_AGE_RECIPIENT`, `BACKUP_S3_ENDPOINT`, `BACKUP_S3_BUCKET`, `BACKUP_S3_ACCESS_KEY_ID`, `BACKUP_S3_SECRET_ACCESS_KEY` |
 | `env/compose.env.example` | `infrastructure/.env` | Docker Compose (interpolación) | `ENV_DIR`, `DOMAIN`, `ACME_EMAIL`, `IMAGE_TAG`, `GHCR_OWNER`. Nada secreto |
 
@@ -21,7 +21,7 @@ Reglas:
 - Cada secreto lleva en el ejemplo el marcador `CHANGE_ME`. El backend rechaza al arrancar cualquier secreto que lo contenga, en todos los entornos (`plan-backend` D-22).
 - El backend también rechaza cualquier variable `BACKUP_*` o `MONGO_INITDB_*`: cada fichero llega solo a su servicio.
 - Las contraseñas de MongoDB se repiten y deben coincidir: `MONGO_APP_PASSWORD` con el `MONGODB_URI` de `backend.env`, `MONGO_MIGRATE_PASSWORD` con el de `migrate.env`, y `MONGO_BACKUP_*` de `mongodb.env` con los de `backup.env`.
-- `mongodb.env` solo tiene efecto al inicializar un volumen vacío. Cambiar una contraseña después exige el procedimiento de rotación de producción (S-32) o recrear el volumen en desarrollo.
+- `mongodb.env` solo tiene efecto al inicializar un volumen vacío, cuando `init.js` crea los usuarios (ver [`mongodb.md`](mongodb.md)). Cambiar una contraseña después exige el procedimiento de rotación de producción (S-32) o recrear el volumen en desarrollo.
 - En desarrollo, `backup.env` lleva valores de relleno: `make backup` local no cifra ni sube a S3 (S-08).
 - Toda variable nueva se añade a la vez en su `*.env.example`, en la validación Zod (si es del backend), en `env-init` (si es secreta) y en este documento.
 
