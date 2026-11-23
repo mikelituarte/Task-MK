@@ -1,0 +1,222 @@
+#!/usr/bin/env bash
+# env-init — genera los ficheros de entorno de desarrollo y E2E a partir de los
+# *.env.example, sustituyendo cada CHANGE_ME por un secreto aleatorio (C-11).
+#
+#   infrastructure/env/{backend,mongodb,migrate,backup}.env   desarrollo
+#   infrastructure/.env                                       Compose (desarrollo)
+#   infrastructure/env/e2e/{backend,mongodb,migrate}.env      E2E
+#   infrastructure/env/e2e/compose.env                        Compose (E2E)
+#
+# Reglas:
+#   - Nunca sobrescribe un fichero existente: ejecutarlo de nuevo no cambia nada.
+#   - Los ficheros se crean con permisos 600.
+#   - No imprime ningún secreto.
+#   - Aborta con TASKMK_ENV=production: en producción los ficheros los crea
+#     una persona a mano en /etc/taskmk (docs/deployment/secrets.md).
+#
+# Uso: infrastructure/scripts/env-init
+
+set -euo pipefail
+umask 077
+
+readonly MARKER='CHANGE_ME'
+
+die() {
+  printf 'env-init: error: %s\n' "$*" >&2
+  exit 1
+}
+
+info() {
+  printf 'env-init: %s\n' "$*"
+}
+
+if [[ "${TASKMK_ENV:-}" == "production" ]]; then
+  die "TASKMK_ENV=production. En producción los ficheros de /etc/taskmk se crean a mano (docs/deployment/secrets.md). No se ha creado nada."
+fi
+
+command -v openssl >/dev/null 2>&1 || die "openssl no está disponible."
+
+INFRA_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+readonly INFRA_DIR
+readonly EXAMPLES_DIR="$INFRA_DIR/env"
+
+# Secretos de aplicación: base64 de 48 bytes (64 caracteres).
+gen_base64() {
+  openssl rand -base64 48 | tr -d '\n'
+}
+
+# Contraseñas y credenciales: hexadecimal, seguro dentro de un URI sin codificar (C-10).
+gen_hex() {
+  openssl rand -hex 32 | tr -d '\n'
+}
+
+# Contraseñas de MongoDB de un conjunto (dev o e2e). Se comparten entre ficheros.
+declare -A MONGO_PW=()
+
+new_mongo_passwords() {
+  MONGO_PW=(
+    [root]="$(gen_hex)"
+    [app]="$(gen_hex)"
+    [migrate]="$(gen_hex)"
+    [backup]="$(gen_hex)"
+  )
+}
+
+# Valor que sustituye a CHANGE_ME para una variable dada.
+secret_for() {
+  local key="$1" value="$2" user
+  case "$key" in
+    JWT_ACCESS_SECRET | CSRF_SECRET | LOGIN_THROTTLE_SECRET)
+      gen_base64
+      ;;
+    MONGO_INITDB_ROOT_PASSWORD) printf '%s' "${MONGO_PW[root]}" ;;
+    MONGO_APP_PASSWORD) printf '%s' "${MONGO_PW[app]}" ;;
+    MONGO_MIGRATE_PASSWORD) printf '%s' "${MONGO_PW[migrate]}" ;;
+    MONGO_BACKUP_PASSWORD) printf '%s' "${MONGO_PW[backup]}" ;;
+    MONGODB_URI)
+      if [[ "$value" =~ ^mongodb://([a-z]+):${MARKER}@ ]]; then
+        user="${BASH_REMATCH[1]}"
+      else
+        die "MONGODB_URI de ejemplo con formato inesperado."
+      fi
+      [[ -n "${MONGO_PW[$user]:-}" ]] || die "MONGODB_URI usa un usuario desconocido: $user."
+      printf '%s' "${MONGO_PW[$user]}"
+      ;;
+    BACKUP_S3_ACCESS_KEY_ID | BACKUP_S3_SECRET_ACCESS_KEY)
+      gen_hex
+      ;;
+    *)
+      die "la variable $key tiene $MARKER, pero env-init no sabe generarla. Actualiza el script."
+      ;;
+  esac
+}
+
+# render EJEMPLO SALIDA [CLAVE=VALOR...]
+# Escribe SALIDA a partir de EJEMPLO. Las parejas CLAVE=VALOR fijan valores no
+# secretos propios del conjunto (por ejemplo, ENV_DIR en E2E).
+render() {
+  local example="$1" out="$2"
+  shift 2
+  local -A overrides=()
+  local pair line key value secret
+  for pair in "$@"; do
+    overrides["${pair%%=*}"]="${pair#*=}"
+  done
+
+  [[ -f "$example" ]] || die "no existe el ejemplo ${example#"$INFRA_DIR"/}."
+
+  {
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      if [[ "$line" =~ ^([A-Z0-9_]+)=(.*)$ ]]; then
+        key="${BASH_REMATCH[1]}"
+        value="${BASH_REMATCH[2]}"
+        if [[ -n "${overrides[$key]+x}" ]]; then
+          value="${overrides[$key]}"
+          unset 'overrides[$key]'
+        fi
+        if [[ "$value" == *"$MARKER"* ]]; then
+          secret="$(secret_for "$key" "$value")"
+          value="${value//"$MARKER"/"$secret"}"
+        fi
+        printf '%s=%s\n' "$key" "$value"
+      else
+        printf '%s\n' "$line"
+      fi
+    done <"$example"
+  } >"$out"
+
+  ((${#overrides[@]} == 0)) || die "variables no presentes en ${example#"$INFRA_DIR"/}: ${!overrides[*]}."
+  ! grep -q "$MARKER" "$out" || die "queda $MARKER en ${out#"$INFRA_DIR"/}."
+}
+
+# Mueve los ficheros generados en TMP a su destino sin sobrescribir nada.
+install_files() {
+  local tmp="$1" dest_dir="$2"
+  shift 2
+  local name
+  mkdir -p "$dest_dir"
+  for name in "$@"; do
+    # -n: nunca sobrescribe. Se comprueba después por si otro proceso se adelantó.
+    mv -n "$tmp/$name" "$dest_dir/$name" || true
+    [[ ! -e "$tmp/$name" ]] || die "${dest_dir#"$INFRA_DIR"/}/$name apareció mientras se generaba; no se ha tocado."
+    chmod 600 "$dest_dir/$name"
+    info "creado ${dest_dir#"$INFRA_DIR"/}/$name"
+  done
+}
+
+# generate_set NOMBRE DIR_DESTINO FICHERO... -- [CLAVE=VALOR...]
+# Los ficheros con secretos de MongoDB enlazados forman un conjunto: o se crean
+# todos o ninguno, para que las contraseñas coincidan.
+generate_set() {
+  local label="$1" dest_dir="$2"
+  shift 2
+  local files=() overrides=() name present=() missing=()
+  while (($#)) && [[ "$1" != "--" ]]; do
+    files+=("$1")
+    shift
+  done
+  (($#)) && shift
+  overrides=("$@")
+
+  for name in "${files[@]}"; do
+    if [[ -e "$dest_dir/$name" ]]; then
+      present+=("$name")
+    else
+      missing+=("$name")
+    fi
+  done
+
+  if ((${#missing[@]} == 0)); then
+    info "$label: ya existen todos los ficheros; no se cambia nada."
+    return
+  fi
+  if ((${#present[@]} > 0)); then
+    die "$label: faltan ${missing[*]}, pero existen ${present[*]}. Las contraseñas de MongoDB deben coincidir entre ellos y env-init no lee los existentes. Borra los de este conjunto en ${dest_dir#"$INFRA_DIR"/} y vuelve a ejecutarlo (con un volumen de MongoDB ya inicializado, bórralo también)."
+  fi
+
+  local tmp
+  tmp="$(mktemp -d "$INFRA_DIR/env/.env-init.XXXXXX")"
+  # shellcheck disable=SC2064
+  trap "rm -rf -- '$tmp'" EXIT
+
+  new_mongo_passwords
+  for name in "${files[@]}"; do
+    render "$EXAMPLES_DIR/$name.example" "$tmp/$name" "${overrides[@]}"
+  done
+  install_files "$tmp" "$dest_dir" "${files[@]}"
+
+  rm -rf -- "$tmp"
+  trap - EXIT
+  MONGO_PW=()
+}
+
+# generate_single NOMBRE EJEMPLO DESTINO [CLAVE=VALOR...]
+generate_single() {
+  local label="$1" example="$2" dest="$3"
+  shift 3
+  if [[ -e "$dest" ]]; then
+    info "$label: ${dest#"$INFRA_DIR"/} ya existe; no se cambia."
+    return
+  fi
+  local tmp
+  tmp="$(mktemp -d "$INFRA_DIR/env/.env-init.XXXXXX")"
+  # shellcheck disable=SC2064
+  trap "rm -rf -- '$tmp'" EXIT
+  render "$example" "$tmp/out" "$@"
+  mv "$tmp/out" "$tmp/$(basename "$dest")"
+  install_files "$tmp" "$(dirname "$dest")" "$(basename "$dest")"
+  rm -rf -- "$tmp"
+  trap - EXIT
+}
+
+# Desarrollo.
+generate_set "dev" "$INFRA_DIR/env" \
+  backend.env mongodb.env migrate.env backup.env
+generate_single "dev" "$EXAMPLES_DIR/compose.env.example" "$INFRA_DIR/.env"
+
+# E2E: valores de la columna e2e de 7.5 que van en ficheros. NODE_ENV,
+# COOKIE_SECURE, TRUST_PROXY y APP_URL los fija el override de Compose.
+generate_set "e2e" "$INFRA_DIR/env/e2e" \
+  backend.env mongodb.env migrate.env
+generate_single "e2e" "$EXAMPLES_DIR/compose.env.example" "$INFRA_DIR/env/e2e/compose.env" \
+  ENV_DIR=./env/e2e DOMAIN=localhost
