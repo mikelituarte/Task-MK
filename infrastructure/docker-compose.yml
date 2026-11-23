@@ -1,0 +1,86 @@
+# Compose base de Task-MK (plan-infrastructure, fase 5; §3).
+# No se usa solo: siempre con un override (dev, prod o e2e).
+# - No publica ningún puerto: lo hace cada override (en prod, solo proxy).
+# - ENV_DIR es obligatoria: ./env (dev), ./env/e2e (e2e) o /etc/taskmk (prod).
+# - proxy y migrate no están aquí: van en los overrides con sus restricciones (C-09).
+name: taskmk
+
+services:
+  mongodb:
+    # MongoDB 8.0.38 por digest (ver docs/infrastructure/stack.md). La actualiza Dependabot.
+    image: mongo:8.0.38@sha256:479e85ced54ffb8a40dade1dcde2da2a9ae858515b9415e9cc54bfb8f0575d01
+    command: ["--noscripting"]
+    env_file:
+      - ${ENV_DIR:?Falta ENV_DIR; ver docs/infrastructure/environment.md}/mongodb.env
+    volumes:
+      - mongo-data:/data/db
+      # Solo se ejecuta al inicializar un volumen vacío (docs/infrastructure/mongodb.md).
+      - ./mongodb/init.js:/docker-entrypoint-initdb.d/init.js:ro
+    networks:
+      - data
+    restart: unless-stopped
+    healthcheck:
+      # Conecta por la IP del contenedor, no por 127.0.0.1: el mongod temporal que
+      # ejecuta init.js solo escucha en loopback y no debe contar como healthy
+      # (ver docs/infrastructure/stack.md).
+      test: ["CMD-SHELL", "mongosh --quiet --host \"$(hostname)\" --eval \"db.adminCommand('ping').ok\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 500
+
+  backend:
+    env_file:
+      - ${ENV_DIR:?Falta ENV_DIR; ver docs/infrastructure/environment.md}/backend.env
+    networks:
+      - app
+      - data
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      # Las imágenes Alpine no traen curl: se usa el fetch de Node.
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 200
+
+  frontend:
+    networks:
+      - edge
+      - app
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 200
+
+networks:
+  # internal se activa en los overrides de prod y e2e (§3.3); nunca en dev.
+  edge: {}
+  app: {}
+  data: {}
+
+volumes:
+  mongo-data: {}
