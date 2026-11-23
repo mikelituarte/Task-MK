@@ -1,0 +1,69 @@
+# Override de desarrollo (plan-infrastructure, fase 5; §3.6).
+# docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# - Imágenes construidas en local con target dev y código montado.
+# - Puertos publicados solo en 127.0.0.1.
+# - migrate se ejecuta en cada arranque, antes de backend.
+# - Ninguna red es internal: mongodb publica 27017 en local.
+
+services:
+  mongodb:
+    ports:
+      - "127.0.0.1:27017:27017"
+
+  backend:
+    build:
+      context: ../backend
+      target: dev
+    environment:
+      # Regla de precedencia S-03: estas tres no van en backend.env.
+      NODE_ENV: development
+      COOKIE_SECURE: "false"
+      TRUST_PROXY: "1"
+    volumes:
+      - ../backend:/app
+      - /app/node_modules
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  frontend:
+    build:
+      context: ../frontend
+      target: dev
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules
+    ports:
+      - "127.0.0.1:5173:5173"
+    healthcheck:
+      # El Dockerfile no define HEALTHCHECK para dev (C-13).
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5173/').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  migrate:
+    build: ./mongodb
+    env_file:
+      - ${ENV_DIR:?Falta ENV_DIR; ver docs/infrastructure/environment.md}/migrate.env
+    networks:
+      - data
+    restart: "no"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    volumes:
+      # Lectura y escritura: `migrate-mongo create` escribe aquí. `up` no escribe nada.
+      # make migrate-create (fase 6) lo ejecuta con --user "$(id -u):$(id -g)".
+      - ./mongodb/migrations:/app/migrations
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 200

@@ -65,7 +65,7 @@ Si añades una variable secreta a un ejemplo, `env-init` falla hasta que se le e
 | `ENV_DIR` | `./env` | `./env/e2e` | `/etc/taskmk` | `infrastructure/.env`, `env/e2e/compose.env` o `/opt/taskmk/infrastructure/.env` |
 | `DOMAIN` | No se usa | `localhost` | Dominio dedicado | Ídem |
 
-Los ficheros de Compose que aplican esta regla llegan en las fases 5 y 7.
+`docker-compose.dev.yml` aplica esta regla (ver [`stack.md`](stack.md)); los overrides de `e2e` y `prod` llegan en la fase 7.
 
 ## Agentes
 
