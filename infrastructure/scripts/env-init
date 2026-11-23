@@ -30,6 +30,11 @@ info() {
   printf 'env-init: %s\n' "$*"
 }
 
+# Ruta relativa a infrastructure/, para los mensajes.
+rel() {
+  printf %s "${1#"$INFRA_DIR"/}"
+}
+
 if [[ "${TASKMK_ENV:-}" == "production" ]]; then
   die "TASKMK_ENV=production. En producción los ficheros de /etc/taskmk se crean a mano (docs/deployment/secrets.md). No se ha creado nada."
 fi
@@ -140,7 +145,7 @@ install_files() {
     mv -n "$tmp/$name" "$dest_dir/$name" || true
     [[ ! -e "$tmp/$name" ]] || die "${dest_dir#"$INFRA_DIR"/}/$name apareció mientras se generaba; no se ha tocado."
     chmod 600 "$dest_dir/$name"
-    info "creado ${dest_dir#"$INFRA_DIR"/}/$name"
+    info "creado $(rel "$dest_dir/$name")"
   done
 }
 
