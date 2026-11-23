@@ -10,9 +10,9 @@ Toda la documentación está en [`docs/`](docs/):
 
 - [`docs/frontend/`](docs/frontend/)
 - [`docs/backend/`](docs/backend/)
-- [`docs/infrastructure/`](docs/infrastructure/)
+- [`docs/infrastructure/`](docs/infrastructure/): [devcontainer](docs/infrastructure/devcontainer.md), [ficheros de entorno y `env-init`](docs/infrastructure/environment.md)
 - [`docs/security/`](docs/security/)
-- [`docs/deployment/`](docs/deployment/)
+- [`docs/deployment/`](docs/deployment/): [secretos de producción](docs/deployment/secrets.md)
 
 ## Seguridad
 

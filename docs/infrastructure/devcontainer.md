@@ -56,7 +56,7 @@ Con la CLI `devcontainer` no se reenvía nada. `taskmk-verify-isolation` falla s
 
 ## Reglas `deny`
 
-Unión de `raw-infrastructure.md` §12 y SEC-008: lectura y edición de `.env*`, `**/*.env` (los `*.env.example` no coinciden), `infrastructure/.env`, `~/.ssh` y `~/.aws`; comandos `gh secret`, `ssh`, `make prod-deploy`, `make restore`, `make reset-db` y `make admin-*`. Además, por decisión del 2026-11-11 (SEC-008), el agente no puede editar `.claude/settings*.json` ni `.mcp.json`: solo una persona cambia sus reglas.
+Unión de `raw-infrastructure.md` §12 y SEC-008: lectura y edición de `.env*`, `**/*.env` (los `*.env.example` no coinciden), `infrastructure/.env`, `~/.ssh` y `~/.aws`; comandos `gh secret`, `ssh`, `make prod-deploy`, `make restore`, `make reset-db` y `make admin-*`. Además, por decisión del 2026-11-11 (SEC-008), el agente no puede editar `.claude/settings*.json` ni `.mcp.json`: solo una persona cambia sus reglas. Qué ficheros cubren y cómo comprobarlos sin leerlos: [`environment.md`](environment.md).
 
 ## Límites conocidos
 
