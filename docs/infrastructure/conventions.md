@@ -26,7 +26,7 @@ Las migraciones usan `migrate-mongo` y están en `infrastructure/mongodb/migrati
 
 | Entorno | Cuándo | Cómo |
 |---|---|---|
-| Desarrollo | En cada `make up`, antes de `backend` | Servicio `migrate` (fases 5 y 6) |
+| Desarrollo | En cada `make up`, antes de `backend` | Servicio `migrate` de `docker-compose.dev.yml` (ver [`stack.md`](stack.md)) |
 | Desarrollo, a mano | A petición | `make migrate`, `make migrate-status`, `make migrate-create n=<nombre>` (fase 6) |
 | E2E y CI | Antes de `backend` | Servicio `migrate` (fases 7 y 8) |
 | Producción | En `make prod-deploy`, después del backup `predeploy/` y antes de `up -d` | `docker compose --profile tools run --rm migrate` (fase 10) |

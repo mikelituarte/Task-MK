@@ -30,7 +30,7 @@ Una sola instancia de MongoDB 8, arrancada con `--noscripting` y autenticación 
 
 ## Cuándo se ejecuta `init.js`
 
-La imagen oficial de `mongo` ejecuta los ficheros de `/docker-entrypoint-initdb.d/` **solo al inicializar un volumen vacío**, como root (que crea la propia imagen con `MONGO_INITDB_ROOT_*`). Compose monta `init.js` ahí en solo lectura (fases 5 y 7).
+La imagen oficial de `mongo` ejecuta los ficheros de `/docker-entrypoint-initdb.d/` **solo al inicializar un volumen vacío**, como root (que crea la propia imagen con `MONGO_INITDB_ROOT_*`). `docker-compose.yml` monta `init.js` ahí en solo lectura (ver [`stack.md`](stack.md)).
 
 - Con un volumen que ya tiene datos, `init.js` no se ejecuta: cambiar `mongodb.env` después no cambia nada.
 - Si falta alguna variable `MONGO_INITDB_DATABASE`, `MONGO_APP_*`, `MONGO_MIGRATE_*` o `MONGO_BACKUP_*`, aborta con un error que nombra las que faltan. La inicialización falla y el contenedor no llega a arrancar.
